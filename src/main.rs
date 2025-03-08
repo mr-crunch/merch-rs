@@ -149,7 +149,40 @@ fn main() {
                 w.add_layer(Dialog::info(output));
             }
         }))
-        .child(Button::new("Delete by ID", |w| w.quit()));
+        .child(Button::new("Delete by ID", {
+            let merch_clone = Arc::clone(&merch_items);
+            move |w| {
+                let id_input = EditView::new().with_name("delete_id").min_width(10);
+                w.add_layer(Dialog::new().title("Delete entry").content(ListView::new().child("Enter entry ID to delete", id_input)).button("Confirm", {
+                    let merch_clone = Arc::clone(&merch_clone);
+                    move |w| {
+                        let id_str = w.call_on_name("delete_id", |view: &mut EditView| {
+                            view.get_content()
+                        })
+                        .unwrap()
+                        .to_string();
+                        if let Ok(id) = id_str.parse::<usize>() {
+                            let mut stored_merch = merch_clone.lock().unwrap();
+                            if id > 0 && id <= stored_merch.len() {
+                                stored_merch.remove(id - 1);
+                                if let Err(error) = save_to_file(&stored_merch) {
+                                    w.add_layer(Dialog::info(format!("Error deleting entry: {}", error)));
+                                } else {
+                                    w.add_layer(Dialog::info("Entry deleted successfully"));
+                                }
+                            } else {
+                                w.add_layer(Dialog::info("Could not find index. Please enter a valid ID"));
+                            }
+                        } else {
+                            w.add_layer(Dialog::info("ID must be a valid number"));
+                        }
+                    }
+                }).button("Cancel", |w| {
+                        w.pop_layer();
+                    })
+                );
+            }
+        }));
     win.add_layer(
         Dialog::around(LinearLayout::vertical().child(edit_fields).child(buttons))
             .title("Merch Inventory Management"),
