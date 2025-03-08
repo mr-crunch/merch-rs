@@ -1,0 +1,9 @@
+[package]
+name = "cursive_bills"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cursive = "0.21.1"
+serde = {version = "1.0.128", features = ["derive"]}
+serde_json = "1.0.140"
