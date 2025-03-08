@@ -12,7 +12,7 @@ struct Merch {
     size: String,
     merch_type: String,
     price: f32,
-    amount: usize,
+    avail_amount: usize,
     total_price: f32,
     design: String,
 }
@@ -64,8 +64,91 @@ fn main() {
         .child("Amount Available:", EditView::new().with_name("amount"));
     let buttons = LinearLayout::horizontal()
         .child(Button::new("Quit", quit_check))
-        .child(Button::new("Save", |w| w.quit()))
-        .child(Button::new("Show all", |w| w.quit()))
+        .child(Button::new("Save", {
+            let merch_clone = Arc::clone(&merch_items);
+            move |w| {
+                let merch_type = w
+                    .call_on_name("merch_type", |view: &mut EditView| view.get_content())
+                    .unwrap()
+                    .to_string();
+                let size = w
+                    .call_on_name("size", |view: &mut EditView| view.get_content())
+                    .unwrap()
+                    .to_string();
+                let price = w
+                    .call_on_name("price", |view: &mut EditView| view.get_content())
+                    .unwrap()
+                    .parse::<f32>()
+                    .unwrap_or(0.0);
+                let design = w
+                    .call_on_name("design", |view: &mut EditView| view.get_content())
+                    .unwrap()
+                    .to_string();
+                let avail_amount = w
+                    .call_on_name("amount", |view: &mut EditView| view.get_content())
+                    .unwrap()
+                    .parse::<usize>()
+                    .unwrap_or(0);
+                if merch_type.is_empty() {
+                    w.add_layer(Dialog::info("Please enter a product type."));
+                    return;
+                }
+                if size.is_empty() {
+                    w.add_layer(Dialog::info("Please enter a size"));
+                    return;
+                }
+                if price <= 0.0 {
+                    w.add_layer(Dialog::info("Please enter a valid price"));
+                    return;
+                }
+                if design.is_empty() {
+                    w.add_layer(Dialog::info("Please enter a design ID"));
+                    return;
+                }
+                if avail_amount == 0 {
+                    w.add_layer(Dialog::info("Please enter a valid amount"));
+                    return;
+                }
+                let total_price = price * avail_amount as f32;
+                let merch = Merch {
+                    size,
+                    merch_type,
+                    avail_amount,
+                    price,
+                    design,
+                    total_price,
+                };
+                let mut stored_merch = merch_clone.lock().unwrap();
+                stored_merch.push(merch.clone());
+                if let Err(error) = save_to_file(&stored_merch) {
+                    w.add_layer(Dialog::info(format!("Error saving entry: {:?}", error)));
+                } else {
+                    w.add_layer(Dialog::info("Entry saved successfully"));
+                }
+            }
+        }))
+        .child(Button::new("Show all", {
+            let merch_clone = Arc::clone(&merch_items);
+            move |w| {
+                let stored_merch = merch_clone.lock().unwrap();
+                let mut output = String::new();
+                for (idx, merch_item) in stored_merch.iter().enumerate() {
+                    output.push_str(&format!(
+                    "{}. Type: {}, Design: {}, Size: {},\n    Available Amount: {}, Price: ${}, Total Price: ${}\n",
+                    idx +1,
+                    merch_item.merch_type,
+                    merch_item.design,
+                    merch_item.size,
+                    merch_item.avail_amount,
+                    merch_item.price,
+                    merch_item.total_price,));
+                }
+                if output.is_empty() {
+                    output = String::from("No products to display")
+                }
+                w.add_layer(Dialog::info(output));
+            }
+        }))
         .child(Button::new("Delete by ID", |w| w.quit()));
     win.add_layer(
         Dialog::around(LinearLayout::vertical().child(edit_fields).child(buttons))
